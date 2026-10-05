@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PWA Vidéo Background</title>
+  
+  <!-- Configuration PWA iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PWA Vidéo">
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #000;
+    }
+    /* Vidéos superposées remplissant exactement l'écran */
+    .video-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      display: block;
+    }
+    .video-bg.top {
+      z-index: 2;
+    }
+    .video-bg.bottom {
+      z-index: 1;
+    }
+    
+    /* Rectangle bleu avec texte modifiable */
+    .overlay-text {
+      position: absolute;
+      top: 67%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      
+      color: #ffffff;
+      background-color: #1834CC;
+      
+      width: 85%;
+      max-width: 600px;
+      padding: 0.1rem 1rem;
+      
+      font-size: 0.9rem;
+      font-family: "Arial Rounded MT Bold", "Nunito", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-weight: 600;
+      text-align: center;
+      
+      border-radius: 0;
+      border: none;
+      outline: none;
+      box-shadow: none;
+      
+      -webkit-text-size-adjust: 100%;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      
+      cursor: pointer;
+    }
+
+    /* Nouveau bloc distinct pour le compte à rebours */
+    .timer-container {
+      position: absolute;
+      top: 63%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      
+      width: 80vw;
+      background-color: #1834CC;
+      padding: 0.1rem 1rem;
+      
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      
+      color: #ffffff;
+      font-family: "Arial Rounded MT Bold", "Nunito", -apple-system, BlinkMacSystemFont, sans-serif;
+      text-align: center;
+      
+      border: none;
+      outline: none;
+      box-shadow: none;
+      
+      -webkit-text-size-adjust: 100%;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .timer-label {
+      font-size: 0.8rem;
+      font-weight: 500;
+      margin-bottom: 0.1rem;
+    }
+
+    .timer-digits {
+      font-size: 1.2rem;
+      font-family: "Arial Rounded MT Bold", "Nunito", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-weight: 700;
+      letter-spacing: 1px;
+      line-height: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <video id="vid1" class="video-bg top" autoplay muted playsinline src="video.mp4"></video>
+  <video id="vid2" class="video-bg bottom" muted playsinline src="video.mp4"></video>
+  
+  <!-- Bloc compte à rebours -->
+  <div id="timer-box" class="timer-container">
+    <div id="timer-digits" class="timer-digits">03:00:00</div>
+  </div>
+
+  <!-- Élément éditable directement au clic/toucher -->
+  <div id="editable-text" class="overlay-text" contenteditable="true" spellcheck="false">
+    Validé le 
+  </div>
+
+  <script>
+    // --- GESTION DE LA BOUCLE VIDÉO SEAMLESS ---
+    const vid1 = document.getElementById('vid1');
+    const vid2 = document.getElementById('vid2');
+
+    let current = vid1;
+    let next = vid2;
+    let isSwapping = false;
+
+    const OFFSET = 0.2; 
+
+    function checkLoop() {
+      if (current.duration && (current.duration - current.currentTime <= OFFSET) && !isSwapping) {
+        isSwapping = true;
+        
+        next.currentTime = 0;
+        next.play().then(() => {
+          next.className = 'video-bg top';
+          current.className = 'video-bg bottom';
+
+          const temp = current;
+          current = next;
+          next = temp;
+
+          setTimeout(() => {
+            isSwapping = false;
+          }, (OFFSET + 0.1) * 1000);
+        }).catch(() => {
+          isSwapping = false;
+        });
+      }
+      requestAnimationFrame(checkLoop);
+    }
+
+    requestAnimationFrame(checkLoop);
+
+    // --- GESTION DU TEXTE MODIFIABLE ET AUTOMATIQUE ---
+    const textElement = document.getElementById('editable-text');
+
+    function getFormattedDateTime() {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      const timeStr = now.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      return `Validé le ${dateStr} à ${timeStr}`;
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlText = urlParams.get('txt');
+    const savedText = localStorage.getItem('pwa_custom_text');
+
+    if (urlText) {
+      textElement.innerText = urlText;
+    } else if (savedText) {
+      textElement.innerText = savedText;
+    } else {
+      textElement.innerText = getFormattedDateTime();
+    }
+
+    textElement.addEventListener('input', () => {
+      localStorage.setItem('pwa_custom_text', textElement.innerText);
+    });
+
+    // --- SCRIPT DU COMPTE À REBOURS ---
+    const timerDigits = document.getElementById('timer-digits');
+    const timerBox = document.getElementById('timer-box');
+    const DURATION_MS = 3 * 60 * 60 * 1000;
+
+    let endTime = localStorage.getItem('pwa_timer_endtime');
+
+    if (!endTime || isNaN(endTime)) {
+      endTime = Date.now() + DURATION_MS;
+      localStorage.setItem('pwa_timer_endtime', endTime);
+    } else {
+      endTime = parseInt(endTime, 10);
+    }
+
+    function updateCountdown() {
+      const remainingMs = endTime - Date.now();
+
+      if (remainingMs <= 0) {
+        timerDigits.innerText = "00:00:00";
+        return;
+      }
+
+      const totalSeconds = Math.floor(remainingMs / 1000);
+      const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+      const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+      const seconds = String(totalSeconds % 60).padStart(2, '0');
+
+      timerDigits.innerText = `${hours}:${minutes}:${seconds}`;
+    }
+
+    timerBox.addEventListener('dblclick', () => {
+      endTime = Date.now() + DURATION_MS;
+      localStorage.setItem('pwa_timer_endtime', endTime);
+      updateCountdown();
+    });
+
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+
+    // --- SERVICE WORKER ---
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js')
+          .then(reg => console.log('SW enregistré !', reg.scope))
+          .catch(err => console.error('Échec SW :', err));
+      });
+    }
+  </script>
+</body>
+</html>
